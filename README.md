@@ -258,6 +258,8 @@ With `CLOUDFLARE_WORKERS_TOKEN` set, HuggingMes can create a keep-alive worker t
 | `JUPYTER_TOKEN` | *(uses `GATEWAY_TOKEN`)* | Override terminal password (optional) |
 | `WEBHOOK_URL` | — | Endpoint for POST JSON restart notifications |
 | `GATEWAY_RESTART_DELAY` | `5` | Seconds between gateway restart attempts |
+| `GATEWAY_HEALTH_INTERVAL` | `5` | Seconds between gateway health polls |
+| `GATEWAY_HEALTH_FAILURES` | `3` | Consecutive health misses before triggering restart |
 | `GATEWAY_MAX_RESTARTS` | `0` (unlimited) | Maximum gateway restart count before container exits |
 
 ## 💻 Terminal Access (JupyterLab)
