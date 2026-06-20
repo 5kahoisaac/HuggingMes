@@ -821,6 +821,7 @@ while true; do
   done
 
   if [ "$ready" != "true" ]; then
+    [ -n "${SHUTTING_DOWN:-}" ] && exit 0
     echo ""
     echo "Hermes gateway failed to expose the API health port. Last 40 log lines:"
     echo "----------------------------------------"
