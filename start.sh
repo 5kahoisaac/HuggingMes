@@ -439,7 +439,7 @@ graceful_shutdown() {
     [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null || true
   done
   local deadline=$((SECONDS + 10))
-  while jobs -p 2>/dev/null | grep -q .; do
+  while [[ -n $(jobs -p 2>/dev/null) ]]; do
     [ "$SECONDS" -ge "$deadline" ] && break
     sleep 1
   done
@@ -797,17 +797,17 @@ while true; do
   [ -n "${SHUTTING_DOWN:-}" ] && break
 
   # ── Launch or attach ──
-  # hermes gateway run exits immediately after registering a dynamic s6-supervise entry.
-  # On restart iterations use `hermes gateway restart`; `run` is refused when already supervised.
-  if (echo > "/dev/tcp/127.0.0.1/${GATEWAY_API_PORT}") 2>/dev/null; then
-    echo "Hermes gateway already running (supervised); attaching to existing instance..."
-  elif [ "$GATEWAY_RESTART_COUNT" -eq 0 ]; then
-    echo "Launching Hermes gateway..."
-    wait_for_port_free "$GATEWAY_API_PORT"
-    hermes gateway run >> "$HERMES_HOME/logs/gateway.log" 2>&1 || true
-  else
-    echo "Restarting Hermes gateway (attempt ${GATEWAY_RESTART_COUNT})..."
-    hermes gateway restart >> "$HERMES_HOME/logs/gateway.log" 2>&1 || true
+  # `hermes gateway run` exits immediately after handing off to s6-supervise.
+  # Use `hermes gateway restart` on subsequent iterations — `run` is refused when already supervised.
+  if ! (echo > "/dev/tcp/127.0.0.1/${GATEWAY_API_PORT}") 2>/dev/null; then
+    if [ "$GATEWAY_RESTART_COUNT" -eq 0 ]; then
+      echo "Launching Hermes gateway..."
+      wait_for_port_free "$GATEWAY_API_PORT"
+      hermes gateway run >> "$HERMES_HOME/logs/gateway.log" 2>&1 || true
+    else
+      echo "Restarting Hermes gateway (attempt ${GATEWAY_RESTART_COUNT})..."
+      hermes gateway restart >> "$HERMES_HOME/logs/gateway.log" 2>&1 || true
+    fi
   fi
 
   # ── Wait for readiness ──
@@ -828,7 +828,6 @@ while true; do
     exit 1
   fi
 
-  # Start sync loop (only once — shared across all gateway restarts)
   start_background_sync_once
 
   # ── Monitor via health endpoint ──
@@ -846,8 +845,6 @@ while true; do
     fi
   done
 
-  GATEWAY_EXIT_CODE=1
-
   # Sync state before restart
   if [ -n "${HF_TOKEN:-}" ]; then
     echo "Gateway exited — syncing state before restart..."
@@ -856,10 +853,10 @@ while true; do
 
   GATEWAY_RESTART_COUNT=$((GATEWAY_RESTART_COUNT + 1))
   if [ "$GATEWAY_MAX_RESTARTS" != "0" ] && [ "$GATEWAY_RESTART_COUNT" -ge "$GATEWAY_MAX_RESTARTS" ]; then
-    echo "Gateway exited (code ${GATEWAY_EXIT_CODE}); restart limit (${GATEWAY_MAX_RESTARTS}) reached."
-    exit "$GATEWAY_EXIT_CODE"
+    echo "Gateway exited; restart limit (${GATEWAY_MAX_RESTARTS}) reached."
+    exit 1
   fi
 
-  echo "Gateway exited (code ${GATEWAY_EXIT_CODE}); restarting in ${GATEWAY_RESTART_DELAY}s..."
+  echo "Gateway exited; restarting in ${GATEWAY_RESTART_DELAY}s..."
   sleep "$GATEWAY_RESTART_DELAY"
 done
