@@ -434,7 +434,7 @@ graceful_shutdown() {
   fi
   # Stop gateway via CLI so hermes sets gateway_state=stopped.
   # This prevents 02-reconcile-profiles from auto-starting it on the next container boot.
-  hermes gateway stop 2>/dev/null || true
+  timeout 5 hermes gateway stop 2>/dev/null || true
   for pid in "${SYNC_LOOP_PID:-}" "${DASHBOARD_PID:-}" "${JUPYTER_PID:-}"; do
     [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null || true
   done
