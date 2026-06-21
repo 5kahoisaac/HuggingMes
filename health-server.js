@@ -373,7 +373,18 @@ function proxyRequest(
       headers,
     },
     (upstream) => {
-      res.writeHead(upstream.statusCode || 502, upstream.headers);
+      // Strip hop-by-hop headers; Node.js manages transfer-encoding internally.
+      // Passing transfer-encoding from upstream causes double-chunking which
+      // breaks SSE streams (events never flush to the client).
+      const headers = { ...upstream.headers };
+      delete headers["transfer-encoding"];
+      delete headers["connection"];
+      delete headers["keep-alive"];
+      res.writeHead(upstream.statusCode || 502, headers);
+      // Disable Nagle's algorithm for SSE so small event packets flush immediately.
+      if ((headers["content-type"] || "").includes("text/event-stream")) {
+        res.socket?.setNoDelay(true);
+      }
       upstream.pipe(res);
     },
   );

@@ -216,12 +216,12 @@ def restore() -> bool:
                 if should_exclude(child.name, child):
                     continue
                 target = HERMES_HOME / child.name
-                if target.is_dir():
-                    shutil.rmtree(target, ignore_errors=True)
-                elif target.exists():
+                if target.is_symlink() or target.is_file():
                     target.unlink()
+                elif target.is_dir():
+                    shutil.rmtree(target)
                 if child.is_dir():
-                    shutil.copytree(child, target)
+                    shutil.copytree(child, target, dirs_exist_ok=True)
                 else:
                     shutil.copy2(child, target)
 
