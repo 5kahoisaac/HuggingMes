@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.1 - 2026-06-22
+
+### Fixes
+
+- **Gateway API server never bound port 8642 → dashboard stuck "Offline"** — Root cause traced to the v0.3.0 s6 supervision migration. Upstream somratpro/HuggingMes launched the gateway as a child of `start.sh`, so it inherited `start.sh`'s exported `API_SERVER_ENABLED` / `API_SERVER_HOST` / `API_SERVER_PORT` / `API_SERVER_KEY` and bound `127.0.0.1:8642`. Under Hermes v0.17, `hermes gateway run` is redirected into an s6-supervised per-profile service (`gateway-default`) whose run script uses `with-contenv` — it reads `/run/s6/container_environment/`, **not** `start.sh`'s exports. So those vars never reached the gateway and the API-server platform stayed off. Fixed by propagating them through the container environment instead:
+  - `API_SERVER_ENABLED=true`, `API_SERVER_HOST=127.0.0.1`, `API_SERVER_PORT=8642` added to the Dockerfile `ENV` block (Docker `ENV` is dumped into `container_environment` by s6-overlay — proven by `HERMES_HOME`, which reaches the gateway the same way).
+  - New cont-init.d hook `016-huggingmes-api-server-key` aliases `GATEWAY_TOKEN` → `API_SERVER_KEY` in `container_environment`. The gateway's API server **refuses to start without `API_SERVER_KEY`** (`gateway/platforms/api_server.py`), even on loopback; without it the platform reported "api_server disconnected". Numbered `016` so it runs before `02-reconcile-profiles`, which auto-starts gateways whose persisted state was "running" — the key must be in place before that auto-start execs the gateway. Hook is fail-safe (`set -u`, guarded, explicit `exit 0`) and only acts when `GATEWAY_TOKEN` is set and the user hasn't supplied their own `API_SERVER_KEY`.
+- **Recurring `transcription_tools.py` Errno 13 on startup** — The v0.3.0 fix used `chmod u+w`, which only grants write to the file's owner (root, from build time). HF Spaces runs the container as an arbitrary non-root UID, so `u+w` granted that UID nothing and Hermes's `workspace/startup.sh` self-patch kept failing. Changed both the Dockerfile and `start.sh` to `chmod a+w` (and `a+rwx` on directories, after first making them traversable so `find` doesn't silently skip subdirs).
+- **Telegram tile always showed "warn"** — `telegramTone` defaulted to `"warn"`, mislabeling an unconfigured Telegram as a warning. Now defaults to `"neutral"`, shows `"ok"` when configured and connected, and `"warn"` only when configured but not yet working.
+- **Dashboard didn't reflect gateway recovery** — Added `<meta http-equiv="refresh" content="15">` so the status page reflects the Offline→Online transition during the gateway's boot window without a manual reload.
+
 ## 0.3.0 - 2026-06-21
 
 ### Features

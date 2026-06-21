@@ -53,11 +53,18 @@ COPY --chown=hermes:hermes cloudflare-keepalive-setup.py /opt/huggingmes/cloudfl
 COPY --chown=hermes:hermes env-builder.html /opt/huggingmes/env-builder.html
 COPY --chown=hermes:hermes env-builder.js /opt/huggingmes/env-builder.js
 
+# s6 cont-init.d hook: aliases GATEWAY_TOKEN -> API_SERVER_KEY in the gateway's
+# container_environment before main-hermes starts, so the gateway's API server
+# (enabled via API_SERVER_ENABLED above) has the key it requires to bind 8642.
+# Must stay root-owned (runs as root, writes the root-owned env dir).
+COPY cont-init.d/016-huggingmes-api-server-key /etc/cont-init.d/016-huggingmes-api-server-key
+
 RUN chmod +x \
     /opt/huggingmes/start.sh \
     /opt/huggingmes/hermes-sync.py \
     /opt/huggingmes/cloudflare-proxy-setup.py \
-    /opt/huggingmes/cloudflare-keepalive-setup.py
+    /opt/huggingmes/cloudflare-keepalive-setup.py \
+    /etc/cont-init.d/016-huggingmes-api-server-key
 
 # Patch kanban migration: wrap ALTER TABLE ADD COLUMN in try/except so a
 # persisted DB with the column already present doesn't crash the gateway.
