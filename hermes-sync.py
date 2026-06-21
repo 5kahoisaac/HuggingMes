@@ -9,6 +9,7 @@ import shutil
 import signal
 import random
 import socket
+import stat
 import sys
 import tempfile
 import threading
@@ -196,6 +197,21 @@ def create_snapshot_dir(source_root: Path) -> Path:
     return staging_root
 
 
+def _make_writable(path: Path) -> None:
+    """Recursively add owner-write permission so rmtree can delete read-only trees."""
+    for dirpath, dirs, files in os.walk(str(path)):
+        for name in dirs + files:
+            try:
+                full = os.path.join(dirpath, name)
+                os.chmod(full, os.stat(full).st_mode | stat.S_IWUSR)
+            except OSError:
+                pass
+    try:
+        os.chmod(str(path), os.stat(str(path)).st_mode | stat.S_IRWXU)
+    except OSError:
+        pass
+
+
 def restore() -> bool:
     if not HF_TOKEN:
         write_status("disabled", "HF_TOKEN is not configured.")
@@ -219,7 +235,8 @@ def restore() -> bool:
                 if target.is_symlink() or target.is_file():
                     target.unlink()
                 elif target.is_dir():
-                    shutil.rmtree(target)
+                    _make_writable(target)
+                    shutil.rmtree(target, ignore_errors=True)
                 if child.is_dir():
                     shutil.copytree(child, target, dirs_exist_ok=True)
                 else:

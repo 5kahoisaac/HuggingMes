@@ -15,6 +15,8 @@ const GATEWAY_HOST = "127.0.0.1";
 const TERMINAL_BASE = "/terminal";
 const startTime = Date.now();
 const API_SERVER_KEY = process.env.API_SERVER_KEY || "";
+const DEV_MODE = (process.env.DEV_MODE || "true").toLowerCase() !== "false";
+const ENABLE_ENV_BUILDER = (process.env.ENABLE_ENV_BUILDER || "false").toLowerCase() === "true";
 const APP_BASE = "/app";
 const LOGIN_PATH = "/login";
 const SESSION_COOKIE = "huggingmes_session";
@@ -72,8 +74,8 @@ async function detectSpacePrivacy() {
     path: `/api/spaces/${SPACE_ID}`,
     method: "GET",
     headers: Object.assign(
-      { "User-Agent": "HuggingMes/health-server" },
-      token ? { Authorization: `Bearer ${token}` } : {}
+        { "User-Agent": "HuggingMes/health-server" },
+        token ? { Authorization: `Bearer ${token}` } : {}
     ),
   };
   const MAX_ATTEMPTS = 5;
@@ -124,7 +126,7 @@ if (_spacPrivacyEnv !== "public" && _spacPrivacyEnv !== "private") {
 
 const SYNC_STATUS_FILE = "/tmp/huggingmes-sync-status.json";
 const CLOUDFLARE_KEEPALIVE_STATUS_FILE =
-  "/tmp/huggingmes-cloudflare-keepalive-status.json";
+    "/tmp/huggingmes-cloudflare-keepalive-status.json";
 
 function canConnect(port, host = GATEWAY_HOST, timeoutMs = 600) {
   return new Promise((resolve) => {
@@ -159,9 +161,9 @@ function timingSafeEqualString(left, right) {
 function expectedSessionValue() {
   if (!API_SERVER_KEY) return "";
   return crypto
-    .createHmac("sha256", API_SERVER_KEY)
-    .update("huggingmes-session-v1")
-    .digest("hex");
+      .createHmac("sha256", API_SERVER_KEY)
+      .update("huggingmes-session-v1")
+      .digest("hex");
 }
 
 function parseCookies(req) {
@@ -200,11 +202,11 @@ function getBearerToken(req) {
 function isAuthorized(req) {
   if (!API_SERVER_KEY) return true;
   return (
-    timingSafeEqualString(getBearerToken(req), API_SERVER_KEY) ||
-    timingSafeEqualString(
-      parseCookies(req)[SESSION_COOKIE],
-      expectedSessionValue(),
-    )
+      timingSafeEqualString(getBearerToken(req), API_SERVER_KEY) ||
+      timingSafeEqualString(
+          parseCookies(req)[SESSION_COOKIE],
+          expectedSessionValue(),
+      )
   );
 }
 
@@ -254,10 +256,10 @@ function renderLoginPage(nextPath, errorMessage = "") {
 
 function escapeHtml(value) {
   return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
 }
 
 function readRequestBody(req, limit = 64 * 1024) {
@@ -289,7 +291,7 @@ function wantsHtml(req) {
 
 async function handleLogin(req, res, parsed) {
   const nextPath = sanitizeNext(
-    parsed.searchParams.get("next") || `${APP_BASE}/`,
+      parsed.searchParams.get("next") || `${APP_BASE}/`,
   );
 
   if (!API_SERVER_KEY) {
@@ -324,10 +326,10 @@ async function handleLogin(req, res, parsed) {
         "cache-control": "no-store",
       });
       res.end(
-        renderLoginPage(
-          submittedNext,
-          "That token did not match GATEWAY_TOKEN.",
-        ),
+          renderLoginPage(
+              submittedNext,
+              "That token did not match GATEWAY_TOKEN.",
+          ),
       );
       return;
     }
@@ -348,11 +350,11 @@ async function handleLogin(req, res, parsed) {
 }
 
 function proxyRequest(
-  req,
-  res,
-  targetPort,
-  rewritePath = (path) => path,
-  headerOverrides = {},
+    req,
+    res,
+    targetPort,
+    rewritePath = (path) => path,
+    headerOverrides = {},
 ) {
   const parsed = new URL(req.url, "http://localhost");
   const targetPath = rewritePath(parsed.pathname) + parsed.search;
@@ -365,28 +367,28 @@ function proxyRequest(
   };
 
   const proxy = http.request(
-    {
-      hostname: GATEWAY_HOST,
-      port: targetPort,
-      method: req.method,
-      path: targetPath,
-      headers,
-    },
-    (upstream) => {
-      // Strip hop-by-hop headers; Node.js manages transfer-encoding internally.
-      // Passing transfer-encoding from upstream causes double-chunking which
-      // breaks SSE streams (events never flush to the client).
-      const headers = { ...upstream.headers };
-      delete headers["transfer-encoding"];
-      delete headers["connection"];
-      delete headers["keep-alive"];
-      res.writeHead(upstream.statusCode || 502, headers);
-      // Disable Nagle's algorithm for SSE so small event packets flush immediately.
-      if ((headers["content-type"] || "").includes("text/event-stream")) {
-        res.socket?.setNoDelay(true);
-      }
-      upstream.pipe(res);
-    },
+      {
+        hostname: GATEWAY_HOST,
+        port: targetPort,
+        method: req.method,
+        path: targetPath,
+        headers,
+      },
+      (upstream) => {
+        // Strip hop-by-hop headers; Node.js manages transfer-encoding internally.
+        // Passing transfer-encoding from upstream causes double-chunking which
+        // breaks SSE streams (events never flush to the client).
+        const headers = { ...upstream.headers };
+        delete headers["transfer-encoding"];
+        delete headers["connection"];
+        delete headers["keep-alive"];
+        res.writeHead(upstream.statusCode || 502, headers);
+        // Disable Nagle's algorithm for SSE so small event packets flush immediately.
+        if ((headers["content-type"] || "").includes("text/event-stream")) {
+          res.socket?.setNoDelay(true);
+        }
+        upstream.pipe(res);
+      },
   );
 
   proxy.on("error", (error) => {
@@ -413,19 +415,22 @@ function formatUptime(ms) {
 }
 
 async function statusPayload() {
-  const gateway = await canConnect(GATEWAY_PORT);
-  const dashboard = await canConnect(DASHBOARD_PORT);
-  const telegramWebhook =
-    !!process.env.TELEGRAM_WEBHOOK_URL &&
-    (await canConnect(TELEGRAM_WEBHOOK_PORT));
+  const [gateway, dashboard, telegramWebhookUp] = await Promise.all([
+    canConnect(GATEWAY_PORT, GATEWAY_HOST, 2000),
+    canConnect(DASHBOARD_PORT),
+    process.env.TELEGRAM_WEBHOOK_URL
+        ? canConnect(TELEGRAM_WEBHOOK_PORT)
+        : Promise.resolve(false),
+  ]);
+  const telegramWebhook = !!process.env.TELEGRAM_WEBHOOK_URL && telegramWebhookUp;
   const sync = readJson(
-    SYNC_STATUS_FILE,
-    process.env.HF_TOKEN
-      ? {
-          status: "configured",
-          message: "Backup is enabled; waiting for the first sync.",
-        }
-      : { status: "disabled", message: "HF_TOKEN is not configured." },
+      SYNC_STATUS_FILE,
+      process.env.HF_TOKEN
+          ? {
+            status: "configured",
+            message: "Backup is enabled; waiting for the first sync.",
+          }
+          : { status: "disabled", message: "HF_TOKEN is not configured." },
   );
 
   return {
@@ -449,14 +454,14 @@ async function statusPayload() {
       proxy: process.env.CLOUDFLARE_PROXY_URL || "",
     },
     model:
-      process.env.MODEL_FOR_CONFIG ||
-      process.env.HERMES_MODEL ||
-      process.env.LLM_MODEL ||
-      "",
+        process.env.MODEL_FOR_CONFIG ||
+        process.env.HERMES_MODEL ||
+        process.env.LLM_MODEL ||
+        "",
     provider:
-      process.env.PROVIDER_FOR_CONFIG ||
-      process.env.HERMES_INFERENCE_PROVIDER ||
-      "auto",
+        process.env.PROVIDER_FOR_CONFIG ||
+        process.env.HERMES_INFERENCE_PROVIDER ||
+        "auto",
     backup: sync,
     keepalive: readJson(CLOUDFLARE_KEEPALIVE_STATUS_FILE, null),
   };
@@ -509,17 +514,17 @@ function toneBadge(label, tone = "neutral") {
 
 function valueOrUnset(value, fallback = "Not set") {
   return value
-    ? escapeHtml(value)
-    : `<span class="muted">${escapeHtml(fallback)}</span>`;
+      ? escapeHtml(value)
+      : `<span class="muted">${escapeHtml(fallback)}</span>`;
 }
 
 function renderTile({
-  title,
-  value,
-  detail = "",
-  tone = "neutral",
-  meta = "",
-}) {
+                      title,
+                      value,
+                      detail = "",
+                      tone = "neutral",
+                      meta = "",
+                    }) {
   return `<article class="tile ${tone}">
     <div class="tile-head">
       <span class="tile-title">${escapeHtml(title)}</span>
@@ -533,53 +538,57 @@ function renderTile({
 
 function renderDashboard(data) {
   const syncStatus = String(data.backup?.status || "unknown");
-  const syncTone = ["success", "restored", "synced", "configured"].includes(
-    syncStatus,
-  )
-    ? "ok"
-    : syncStatus === "disabled"
-      ? "warn"
-      : "neutral";
-  const telegramTone = data.telegram.configured
-    ? data.telegram.webhookListening || !data.telegram.webhook
-      ? "ok"
-      : "warn"
-    : "warn";
+  const SYNC_OK_STATES = ["success", "restored", "synced", "configured"];
+  let syncTone = "neutral";
+  if (SYNC_OK_STATES.includes(syncStatus)) syncTone = "ok";
+  else if (syncStatus === "disabled") syncTone = "warn";
+
+  let telegramTone = "neutral";
+  if (data.telegram.configured && (data.telegram.webhookListening || !data.telegram.webhook)) {
+    telegramTone = "ok";
+  } else if (data.telegram.configured) {
+    telegramTone = "warn";
+  }
+
   const keepaliveConfigured = data.keepalive?.configured === true;
   const keepaliveStatus = String(
-    data.keepalive?.status ||
+      data.keepalive?.status ||
       (process.env.CLOUDFLARE_WORKERS_TOKEN ? "pending" : "not configured"),
   );
-  const keepAliveTone = keepaliveConfigured
-    ? "ok"
-    : process.env.CLOUDFLARE_WORKERS_TOKEN
-      ? "warn"
-      : "neutral";
+
+  let keepAliveTone = "neutral";
+  if (keepaliveConfigured) keepAliveTone = "ok";
+  else if (process.env.CLOUDFLARE_WORKERS_TOKEN) keepAliveTone = "warn";
+
   const telegramDetail = data.telegram.configured
-    ? `${data.telegram.webhook ? "Webhook" : "Polling"}${data.telegram.proxy ? " via CF proxy" : ""}`
-    : "Not configured";
+      ? `${data.telegram.webhook ? "Webhook" : "Polling"}${data.telegram.proxy ? " via CF proxy" : ""}`
+      : "Not configured";
   const backupDetail = data.backup?.message
-    ? escapeHtml(data.backup.message)
-    : "No status yet";
-  const keepAliveDetail = keepaliveConfigured
-    ? `Pinging <code>${escapeHtml(data.keepalive.targetUrl || "/health")}</code>`
-    : keepaliveStatus === "error" && data.keepalive?.message
-      ? escapeHtml(data.keepalive.message)
-      : process.env.CLOUDFLARE_WORKERS_TOKEN
-        ? "Worker pending or failed"
-        : "Not configured";
+      ? escapeHtml(data.backup.message)
+      : "No status yet";
+
+  let keepAliveDetail;
+  if (keepaliveConfigured) {
+    keepAliveDetail = `Pinging <code>${escapeHtml(data.keepalive.targetUrl || "/health")}</code>`;
+  } else if (keepaliveStatus === "error" && data.keepalive?.message) {
+    keepAliveDetail = escapeHtml(data.keepalive.message);
+  } else if (process.env.CLOUDFLARE_WORKERS_TOKEN) {
+    keepAliveDetail = "Worker pending or failed";
+  } else {
+    keepAliveDetail = "Not configured";
+  }
   const serviceOk = data.gateway && data.dashboard;
 
   const tiles = [
     renderTile({
       title: "Gateway",
       value: toneBadge(
-        data.gateway ? "Online" : "Offline",
-        data.gateway ? "ok" : "off",
+          data.gateway ? "Online" : "Offline",
+          data.gateway ? "ok" : "off",
       ),
       detail: data.gateway
-        ? `API on port ${data.ports.gateway}`
-        : `Unreachable`,
+          ? `API on port ${data.ports.gateway}`
+          : `Unreachable`,
       tone: data.gateway ? "ok" : "off",
       meta: data.authConfigured ? "Protected" : "Unprotected",
     }),
@@ -598,8 +607,8 @@ function renderDashboard(data) {
     renderTile({
       title: "Telegram",
       value: toneBadge(
-        data.telegram.configured ? "Configured" : "Disabled",
-        telegramTone,
+          data.telegram.configured ? "Configured" : "Disabled",
+          telegramTone,
       ),
       detail: telegramDetail,
       tone: telegramTone,
@@ -610,14 +619,14 @@ function renderDashboard(data) {
       detail: backupDetail,
       tone: syncTone,
       meta: data.backup?.timestamp
-        ? `<span class="local-time" data-iso="${data.backup.timestamp}"></span>`
-        : "",
+          ? `<span class="local-time" data-iso="${data.backup.timestamp}"></span>`
+          : "",
     }),
     renderTile({
       title: "Keep Awake",
       value: toneBadge(
-        keepaliveConfigured ? "CF Cron" : keepaliveStatus.toUpperCase(),
-        keepAliveTone,
+          keepaliveConfigured ? "CF Cron" : keepaliveStatus.toUpperCase(),
+          keepAliveTone,
       ),
       detail: keepAliveDetail,
       tone: keepAliveTone,
@@ -629,6 +638,7 @@ function renderDashboard(data) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="refresh" content="15" />
   <title>HuggingMes</title>
   <style>
     :root { color-scheme: dark; --bg:#08080f; --panel:#12111b; --panel2:#151421; --line:#26243a; --text:#f6f4ff; --muted:#7f7a9e; --soft:#b8b3d7; --good:#22c55e; --warn:#f5c542; --bad:#fb7185; --accent:#6557df; --accent2:#7c6cf2; }
@@ -684,8 +694,8 @@ function renderDashboard(data) {
     </header>
     <div class="hero-buttons">
       <a class="hero-action" data-space-link="app" href="${APP_BASE}/">Open Hermes Agent →</a>
-      <a class="hero-action secondary" data-space-link="terminal" href="/terminal/">💻 Open Terminal →</a>
-      <a class="hero-action secondary" data-space-link="env-builder" href="/env-builder">⚙️ ENV Builder →</a>
+      ${DEV_MODE ? `<a class="hero-action secondary" data-space-link="terminal" href="/terminal/">💻 Open Terminal →</a>` : ""}
+      ${ENABLE_ENV_BUILDER ? `<a class="hero-action secondary" data-space-link="env-builder" href="/env-builder">⚙️ ENV Builder →</a>` : ""}
     </div>
     ${syncStatus === "disabled" ? `<div class="warn-banner">⚠️ <strong>Backup is disabled.</strong> HF Spaces storage is ephemeral — all Hermes data (chats, config, memory) will be lost on every Space restart. Set <code>HF_TOKEN</code> in Space secrets to enable automatic backup.</div>` : ""}
     <section class="overview">
@@ -791,19 +801,19 @@ const server = http.createServer(async (req, res) => {
   // In-app navigation from same origin or HF App iframe — skip private redirect.
   const referer = req.headers.referer || req.headers.referrer || "";
   const isSameOriginNav = !!(referer && typeof req.headers.host === "string" &&
-    referer.startsWith(`https://${req.headers.host}`));
+      referer.startsWith(`https://${req.headers.host}`));
   const isFromHFApp = !!(referer && (
-    referer.startsWith("https://huggingface.co") ||
-    referer.startsWith("https://hf.co")
+      referer.startsWith("https://huggingface.co") ||
+      referer.startsWith("https://hf.co")
   ));
 
   const isDirectHfSpaceReq = SPACE_IS_PRIVATE &&
-    HF_SPACE_URL &&
-    isHtmlReq &&
-    !isSameOriginNav &&
-    !isFromHFApp &&
-    typeof req.headers.host === "string" &&
-    req.headers.host.endsWith(".hf.space");
+      HF_SPACE_URL &&
+      isHtmlReq &&
+      !isSameOriginNav &&
+      !isFromHFApp &&
+      typeof req.headers.host === "string" &&
+      req.headers.host.endsWith(".hf.space");
 
   if (path === "/hf-redirect" || path === "/hf-redirect/") {
     if (HF_SPACE_URL) {
@@ -822,11 +832,11 @@ const server = http.createServer(async (req, res) => {
     // startup, keeping HF Space stuck in RUNNING_APP_STARTING indefinitely.
     res.writeHead(200, { "content-type": "application/json" });
     res.end(
-      JSON.stringify({
-        ok: data.ok,
-        gateway: data.gateway,
-        uptime: data.uptime,
-      }),
+        JSON.stringify({
+          ok: data.ok,
+          gateway: data.gateway,
+          uptime: data.uptime,
+        }),
     );
     return;
   }
@@ -839,6 +849,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (path === "/env-builder" || path === "/env-builder/") {
+    if (!ENABLE_ENV_BUILDER) {
+      res.writeHead(404, { "content-type": "text/plain" });
+      res.end("Not found");
+      return;
+    }
     if (!requireAuth(req, res)) return;
     try {
       const html = fs.readFileSync(require("path").join(__dirname, "env-builder.html"), "utf8");
@@ -852,6 +867,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (path === "/env-builder.js") {
+    if (!ENABLE_ENV_BUILDER) {
+      res.writeHead(404, { "content-type": "text/plain" });
+      res.end("Not found");
+      return;
+    }
     if (!requireAuth(req, res)) return;
     try {
       const js = fs.readFileSync(require("path").join(__dirname, "env-builder.js"), "utf8");
@@ -888,20 +908,20 @@ const server = http.createServer(async (req, res) => {
   if (path === APP_BASE || path.startsWith(`${APP_BASE}/`)) {
     if (!requireAuth(req, res)) return;
     proxyRequest(
-      req,
-      res,
-      DASHBOARD_PORT,
-      (p) => p.replace(/^\/app/, "") || "/",
+        req,
+        res,
+        DASHBOARD_PORT,
+        (p) => p.replace(/^\/app/, "") || "/",
     );
     return;
   }
 
   if (
-    path === "/favicon.ico" ||
-    path.startsWith("/assets/") ||
-    path.startsWith("/api/") ||
-    path.startsWith("/dashboard-plugins/") ||
-    path.startsWith("/ds-assets/")
+      path === "/favicon.ico" ||
+      path.startsWith("/assets/") ||
+      path.startsWith("/api/") ||
+      path.startsWith("/dashboard-plugins/") ||
+      path.startsWith("/ds-assets/")
   ) {
     if (!requireAuth(req, res)) return;
     proxyRequest(req, res, DASHBOARD_PORT);
@@ -909,20 +929,20 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (
-    [
-      "/analytics",
-      "/chat",
-      "/config",
-      "/cron",
-      "/docs",
-      "/env",
-      "/logs",
-      "/models",
-      "/plugins",
-      "/profiles",
-      "/sessions",
-      "/skills",
-    ].some((route) => path === route || path.startsWith(`${route}/`))
+      [
+        "/analytics",
+        "/chat",
+        "/config",
+        "/cron",
+        "/docs",
+        "/env",
+        "/logs",
+        "/models",
+        "/plugins",
+        "/profiles",
+        "/sessions",
+        "/skills",
+      ].some((route) => path === route || path.startsWith(`${route}/`))
   ) {
     redirect(res, `${APP_BASE}${path}${parsed.search}`);
     return;
@@ -939,17 +959,17 @@ const server = http.createServer(async (req, res) => {
         "cache-control": "no-store",
       });
       res.end(
-        JSON.stringify({
-          error: "unauthorized",
-          message: "Use Authorization: Bearer <GATEWAY_TOKEN>.",
-        }),
+          JSON.stringify({
+            error: "unauthorized",
+            message: "Use Authorization: Bearer <GATEWAY_TOKEN>.",
+          }),
       );
       return;
     }
     const upstreamHeaders =
-      getBearerToken(req) || !API_SERVER_KEY
-        ? {}
-        : { authorization: `Bearer ${API_SERVER_KEY}` };
+        getBearerToken(req) || !API_SERVER_KEY
+            ? {}
+            : { authorization: `Bearer ${API_SERVER_KEY}` };
     proxyRequest(req, res, GATEWAY_PORT, (p) => p, upstreamHeaders);
     return;
   }
@@ -991,34 +1011,32 @@ const server = http.createServer(async (req, res) => {
   res.end("Not found");
 });
 
-// ── WebSocket upgrade (JupyterLab terminals + Hermes dashboard PTY/events) ──
+// ── WebSocket upgrade (JupyterLab terminals + kernels need this) ──
 server.on("upgrade", (req, socket, head) => {
   const { pathname } = new URL(req.url, "http://localhost");
   const isJupyter = pathname === TERMINAL_BASE || pathname.startsWith(`${TERMINAL_BASE}/`);
+  // /api/* WebSocket (e.g. /api/events) is served by the dashboard process,
+  // not the gateway — match the same routing rule as the HTTP handler above.
   const isDashboardWs =
-      pathname === "/api/pty" ||
-      pathname === "/api/events" ||
-      pathname === "/api/ws";
-  const targetPort = isJupyter
-      ? JUPYTER_PORT
-      : isDashboardWs
-          ? DASHBOARD_PORT
-          : GATEWAY_PORT;
+      pathname.startsWith("/api/") ||
+      pathname.startsWith("/assets/") ||
+      pathname.startsWith("/dashboard-plugins/") ||
+      pathname.startsWith("/ds-assets/");
+  const targetPort = isJupyter ? JUPYTER_PORT : isDashboardWs ? DASHBOARD_PORT : GATEWAY_PORT;
   const ps = net.createConnection(targetPort, GATEWAY_HOST, () => {
     ps.write(`${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`);
     ps.write(`Host: ${GATEWAY_HOST}:${targetPort}\r\n`);
     ps.write(`X-Forwarded-Host: ${req.headers.host || ""}\r\n`);
     ps.write("X-Forwarded-Proto: https\r\n");
-    // Dashboard refuses WS if Origin-Host != Loopback-Bind
-    // Rewrite Origin to Loopback for accepting PTY/events
-    const skip = ["host", "x-forwarded-host", "x-forwarded-proto"];
-    if (isDashboardWs) {
-      ps.write(`Origin: http://${GATEWAY_HOST}:${targetPort}\r\n`);
-      skip.push("origin");
-    }
     for (let i = 0; i < req.rawHeaders.length; i += 2) {
       const lower = req.rawHeaders[i].toLowerCase();
-      if (skip.includes(lower)) continue;
+      if (["host", "x-forwarded-host", "x-forwarded-proto"].includes(lower)) continue;
+      if (lower === "origin") {
+        // hermes _ws_host_origin_is_allowed() rejects external origins like
+        // target address so the check passes.
+        ps.write(`Origin: http://${GATEWAY_HOST}:${targetPort}\r\n`);
+        continue;
+      }
       ps.write(`${req.rawHeaders[i]}: ${req.rawHeaders[i + 1]}\r\n`);
     }
     ps.write("\r\n");
