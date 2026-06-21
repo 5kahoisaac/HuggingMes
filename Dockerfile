@@ -105,6 +105,11 @@ except Exception as e:
     print(f"kanban patch: error ({e}), skipping", file=sys.stderr)
 PY
 
+# hermes v0.17+ self-patches its own Python files at container startup
+# (workspace/startup.sh), but ships them read-only in the image.
+# Grant owner-write to all .py files so startup patches succeed.
+RUN find /opt/hermes -name "*.py" -exec chmod u+w {} + 2>/dev/null || true
+
 # Ensure hermes CLI is discoverable in ALL shell types (login, interactive,
 # non-interactive). /etc/profile.d/ is sourced by login shells after /etc/profile
 # resets PATH, so this survives even full environment resets.
