@@ -6,3 +6,10 @@ node_modules
 .env
 venv
 .venv
+
+.serena
+.idea
+.codegraph
+claude
+*.md
+LICENSE
