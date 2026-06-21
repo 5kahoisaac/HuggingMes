@@ -49,22 +49,6 @@ PY
   fi
 fi
 
-# ── Propagate API server env vars into s6's container environment ──
-# The gateway runs as an s6-supervised longrun service whose run script
-# sources `with-contenv`, which reads /run/s6/container_environment/ —
-# NOT this script's `export`s (those only apply to start.sh's own child
-# processes, e.g. health-server.js). Without this, API_SERVER_ENABLED /
-# PORT / HOST / KEY never reach the gateway process, so its API server
-# platform never starts and port 8642 stays unbound — the dashboard then
-# correctly reports "Gateway: Offline" even though telegram/webhook are
-# fine, because they don't depend on this port. Same pattern hermes's own
-# docker/stage2-hook.sh uses for runtime-computed values.
-mkdir -p /run/s6/container_environment
-printf '%s' "$API_SERVER_ENABLED" > /run/s6/container_environment/API_SERVER_ENABLED
-printf '%s' "$API_SERVER_HOST" > /run/s6/container_environment/API_SERVER_HOST
-printf '%s' "$API_SERVER_PORT" > /run/s6/container_environment/API_SERVER_PORT
-printf '%s' "$API_SERVER_KEY" > /run/s6/container_environment/API_SERVER_KEY
-
 # ── Setup directories ──
 mkdir -p "$HERMES_HOME"/{cron,sessions,logs,hooks,memories,skills,skins,plans,workspace,home,plugins}
 

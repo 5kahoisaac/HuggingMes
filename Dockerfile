@@ -121,11 +121,24 @@ RUN find /opt/hermes -type d -exec chmod a+rwx {} + 2>/dev/null || true \
 RUN echo 'export PATH="/opt/hermes/.venv/bin:/opt/data/.local/bin:$PATH"' \
     > /etc/profile.d/hermes-venv.sh
 
+# API_SERVER_* must be Docker ENV, not start.sh exports. The gateway runs as
+# an independent s6-supervised service (main-hermes) that reads its environment
+# from s6's container_environment — populated from PID 1's env (Docker ENV +
+# runtime secrets) — NOT from start.sh's exports. The gateway enables its
+# OpenAI-compatible API server (binds 127.0.0.1:8642) only when it sees
+# API_SERVER_ENABLED=true (gateway/config.py). Without this the port stays
+# unbound and the dashboard correctly reports "Gateway: Offline" even though
+# telegram works (telegram doesn't depend on 8642). Proven by HERMES_HOME below:
+# it reaches the gateway the same way. A runtime HF Space secret of the same
+# name overrides these defaults.
 ENV HERMES_HOME=/opt/data \
     HUGGINGMES_APP_DIR=/opt/huggingmes \
     HERMES_AGENT_VERSION=${HERMES_AGENT_VERSION} \
     PYTHONUNBUFFERED=1 \
-    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
+    PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium \
+    API_SERVER_ENABLED=true \
+    API_SERVER_HOST=127.0.0.1 \
+    API_SERVER_PORT=8642
 
 EXPOSE 7861
 
