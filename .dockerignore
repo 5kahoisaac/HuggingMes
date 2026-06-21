@@ -7,9 +7,10 @@ node_modules
 venv
 .venv
 
+.github
 .serena
 .idea
 .codegraph
-claude
+.claude
 *.md
 LICENSE
