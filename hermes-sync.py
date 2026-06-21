@@ -153,12 +153,12 @@ def metadata_marker(root: Path) -> tuple[int, int, int]:
         if should_exclude(rel, path):
             continue
         try:
-            stat = path.stat()
+            file_stat = path.stat()
         except OSError:
             continue
         file_count += 1
-        total_size += int(stat.st_size)
-        newest_mtime = max(newest_mtime, int(stat.st_mtime_ns))
+        total_size += int(file_stat.st_size)
+        newest_mtime = max(newest_mtime, int(file_stat.st_mtime_ns))
     return (file_count, total_size, newest_mtime)
 
 
