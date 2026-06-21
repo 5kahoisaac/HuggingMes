@@ -711,6 +711,13 @@ if [ -n "${HUGGINGMES_RUN:-}" ]; then
   hm_run_startup_auto "$HUGGINGMES_RUN"
 fi
 
+# ── Ensure hermes Python files are writable ──
+# hermes v0.17+ self-patches its own .py files inside workspace/startup.sh.
+# The files ship read-only in the Docker image; make them writable now so the
+# patcher can succeed. Must run after the HF Dataset restore (which runs above)
+# in case the restore ever touches /opt/hermes paths via symlinks.
+find /opt/hermes -name "*.py" -exec chmod u+w {} + 2>/dev/null || true
+
 # ── Run workspace startup script ──
 # Replays install commands recorded by the shell wrappers from previous sessions.
 if [ -s "$STARTUP_FILE" ]; then
