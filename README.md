@@ -30,6 +30,8 @@ secrets:
 [![HF Space](https://img.shields.io/badge/🤗%20HuggingFace-Space-blue?style=flat-square)](https://huggingface.co/spaces)
 [![Hermes](https://img.shields.io/badge/Hermes-Agent-indigo?style=flat-square)](https://github.com/NousResearch/hermes-agent)
 
+> **Fork of [somratpro/HuggingMes](https://github.com/somratpro/HuggingMes)** with patches for Hermes v0.17+ compatibility (startup permission fix, restore Errno 13/17, events feed WebSocket routing, gateway health check false-negatives). See [CHANGELOG.md](./CHANGELOG.md) for details.
+
 **Self-hosted Hermes AI agent gateway for Hugging Face Spaces.** HuggingMes runs [Nous Research Hermes Agent](https://github.com/NousResearch/hermes-agent) on HuggingFace Spaces, giving you a 24/7 personal AI assistant with a management dashboard, persistent HF Dataset backup, and automatic connectivity fixes for blocked outbound traffic. HuggingMes directly wires the startup providers listed below, and it can also use Hermes providers configured through `hermes model` or `config.yaml`.
 
 ## Table of Contents
@@ -254,7 +256,8 @@ With `CLOUDFLARE_WORKERS_TOKEN` set, HuggingMes can create a keep-alive worker t
 | `SYNC_INTERVAL` | `600` | Backup frequency in seconds |
 | `CLOUDFLARE_KEEPALIVE_ENABLED` | `true` | Set `false` to disable keep-awake worker |
 | `TELEGRAM_MODE` | `webhook` | `webhook` or `polling` (webhook auto-configured from `SPACE_HOST`) |
-| `DEV_MODE` | `true` | Set `false` to disable JupyterLab terminal at `/terminal/` |
+| `DEV_MODE` | `true` | Set `false` to disable JupyterLab terminal at `/terminal/` and hide the terminal button |
+| `ENABLE_ENV_BUILDER` | `false` | Set `true` to show the ENV Builder at `/env-builder` |
 | `JUPYTER_TOKEN` | *(uses `GATEWAY_TOKEN`)* | Override terminal password (optional) |
 | `WEBHOOK_URL` | — | Endpoint for POST JSON restart notifications |
 | `GATEWAY_RESTART_DELAY` | `5` | Seconds between gateway restart attempts |

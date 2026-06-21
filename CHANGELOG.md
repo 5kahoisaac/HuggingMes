@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 - 2026-06-21
+
+> Fork-specific release — patches applied on top of [somratpro/HuggingMes](https://github.com/somratpro/HuggingMes) v0.2.1.
+
+### Features
+
+- **`ENABLE_ENV_BUILDER` flag** — ENV Builder is now opt-in (`false` by default). Set `ENABLE_ENV_BUILDER=true` to show the `/env-builder` link on the dashboard and enable the route. Users who manage secrets directly through HF Space settings have one less exposed surface.
+- **`DEV_MODE`-gated terminal button** — "💻 Open Terminal →" on the dashboard is hidden when `DEV_MODE=false`, consistent with the existing JupyterLab skip logic already in `start.sh`.
+
+### Fixes
+
+- **Hermes v0.17 startup crash — Python permission denied** — Hermes v0.17 ships its `.py` files read-only but patches them during `workspace/startup.sh`. Added `find /opt/hermes -name "*.py" -exec chmod u+w {} +` in both the Dockerfile (build time) and `start.sh` (runtime, after HF Dataset restore) so self-patching succeeds.
+- **Restore Errno 17 (File exists)** — `shutil.rmtree(ignore_errors=True)` silently failed when a restore target was a symlink-to-directory; the subsequent `copytree` raised "File exists". Fixed by checking `is_symlink()` before rmtree and using `dirs_exist_ok=True` on `copytree`.
+- **Restore Errno 13 (Permission denied)** — Hermes ships some skill directories read-only, causing rmtree to fail and restore to crash. Added `_make_writable()` to recursively `chmod u+w` the target tree before removal.
+- **Events feed disconnected / tool calls not appearing in chat** — Hermes v0.17 serves `/api/events` and other WebSocket endpoints from the dashboard process (port 9119), not the gateway (port 8642). The WebSocket upgrade handler now routes `/api/*`, `/assets/*`, `/dashboard-plugins/*`, and `/ds-assets/*` to `DASHBOARD_PORT`. `Origin` headers are rewritten to the internal target address so hermes's `_ws_host_origin_is_allowed()` check passes.
+- **Gateway showing Offline/Unreachable while hermes is running** — `statusPayload()` ran three sequential `canConnect()` calls (600 ms timeout each); worst case 1800 ms, long enough for the gateway to time out under load and flip to Offline. Replaced with `Promise.all()` (max 600 ms total) and raised the gateway-specific timeout to 2000 ms.
+- **SSE events not flushing to browser** — Upstream hop-by-hop headers (`transfer-encoding`, `connection`, `keep-alive`) forwarded from the hermes backend caused double-chunking that blocked SSE flush. These headers are now stripped; `socket.setNoDelay(true)` added for SSE streams.
+
+### Changes
+
+- Gateway supervision migrated to `hermes gateway run` / `hermes gateway stop` CLI commands for proper s6-overlay lifecycle management, with a graceful shutdown timeout to prevent hangs on Space restart.
+- `hermes-sync.py`: renamed loop variable `stat` → `file_stat` in `metadata_marker` to stop it shadowing the `stat` module import used in `_make_writable`.
+- `health-server.js`: replaced nested ternaries in `renderDashboard` (`syncTone`, `telegramTone`, `keepAliveTone`, `keepAliveDetail`) with `if/else` chains.
+- `env-builder.js`: simplified `...[...new Set(...)]` to `...new Set(...)`.
+
 ## 0.2.1 - 2026-05-20
 
 ### Fixes
