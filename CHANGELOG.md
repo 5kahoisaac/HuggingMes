@@ -2,8 +2,6 @@
 
 ## 0.3.0 - 2026-06-21
 
-> Fork-specific release — patches applied on top of [somratpro/HuggingMes](https://github.com/somratpro/HuggingMes) v0.2.1.
-
 ### Features
 
 - **`ENABLE_ENV_BUILDER` flag** — ENV Builder is now opt-in (`false` by default). Set `ENABLE_ENV_BUILDER=true` to show the `/env-builder` link on the dashboard and enable the route. Users who manage secrets directly through HF Space settings have one less exposed surface.

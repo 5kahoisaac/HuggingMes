@@ -49,6 +49,22 @@ PY
   fi
 fi
 
+# ── Propagate API server env vars into s6's container environment ──
+# The gateway runs as an s6-supervised longrun service whose run script
+# sources `with-contenv`, which reads /run/s6/container_environment/ —
+# NOT this script's `export`s (those only apply to start.sh's own child
+# processes, e.g. health-server.js). Without this, API_SERVER_ENABLED /
+# PORT / HOST / KEY never reach the gateway process, so its API server
+# platform never starts and port 8642 stays unbound — the dashboard then
+# correctly reports "Gateway: Offline" even though telegram/webhook are
+# fine, because they don't depend on this port. Same pattern hermes's own
+# docker/stage2-hook.sh uses for runtime-computed values.
+mkdir -p /run/s6/container_environment
+printf '%s' "$API_SERVER_ENABLED" > /run/s6/container_environment/API_SERVER_ENABLED
+printf '%s' "$API_SERVER_HOST" > /run/s6/container_environment/API_SERVER_HOST
+printf '%s' "$API_SERVER_PORT" > /run/s6/container_environment/API_SERVER_PORT
+printf '%s' "$API_SERVER_KEY" > /run/s6/container_environment/API_SERVER_KEY
+
 # ── Setup directories ──
 mkdir -p "$HERMES_HOME"/{cron,sessions,logs,hooks,memories,skills,skins,plans,workspace,home,plugins}
 
@@ -716,7 +732,14 @@ fi
 # The files ship read-only in the Docker image; make them writable now so the
 # patcher can succeed. Must run after the HF Dataset restore (which runs above)
 # in case the restore ever touches /opt/hermes paths via symlinks.
-find /opt/hermes -name "*.py" -exec chmod u+w {} + 2>/dev/null || true
+# First make directories traversable — find silently skips dirs without the
+# execute bit (errors eaten by 2>/dev/null), so .py files inside them are never
+# reached and remain read-only.
+# Use a+w (not u+w): these files are owned by root from the Docker build, but
+# HF Spaces runs the container as an arbitrary non-root UID at runtime — u+w
+# only grants write to the owner (root), which the runtime UID isn't.
+find /opt/hermes -type d -exec chmod a+rwx {} + 2>/dev/null || true
+find /opt/hermes -name "*.py" -exec chmod a+w {} + 2>/dev/null || true
 
 # ── Run workspace startup script ──
 # Replays install commands recorded by the shell wrappers from previous sessions.

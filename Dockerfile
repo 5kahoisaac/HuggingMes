@@ -107,8 +107,13 @@ PY
 
 # hermes v0.17+ self-patches its own Python files at container startup
 # (workspace/startup.sh), but ships them read-only in the image.
-# Grant owner-write to all .py files so startup patches succeed.
-RUN find /opt/hermes -name "*.py" -exec chmod u+w {} + 2>/dev/null || true
+# Make all subdirs traversable first so find reaches every .py file; dirs
+# without execute permission cause find to silently skip them.
+# Use a+w (not u+w): this RUN executes as root during build, but HF Spaces
+# runs the container as an arbitrary non-root UID at runtime — u+w only
+# grants write to the file's owner (root), which the runtime UID isn't.
+RUN find /opt/hermes -type d -exec chmod a+rwx {} + 2>/dev/null || true \
+    && find /opt/hermes -name "*.py" -exec chmod a+w {} + 2>/dev/null || true
 
 # Ensure hermes CLI is discoverable in ALL shell types (login, interactive,
 # non-interactive). /etc/profile.d/ is sourced by login shells after /etc/profile
