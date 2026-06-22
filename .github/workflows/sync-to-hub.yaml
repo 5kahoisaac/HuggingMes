@@ -6,6 +6,7 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    environment: production
     steps:
       - uses: actions/checkout@v6
       - uses: huggingface/hub-sync@v0.1.0
