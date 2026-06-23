@@ -218,6 +218,10 @@ export CUSTOM_MODEL_MAX_TOKENS="${CUSTOM_MODEL_MAX_TOKENS:-8192}"
 export TELEGRAM_BASE_URL="${TELEGRAM_BASE_URL:-}"
 export TELEGRAM_BASE_FILE_URL="${TELEGRAM_BASE_FILE_URL:-}"
 
+# ── MCP / tool provider keys (Exa, Firecrawl) ──
+export EXA_API_KEY="${EXA_API_KEY:-}"
+export FIRECRAWL_API_KEY="${FIRECRAWL_API_KEY:-}"
+
 if [ -n "${CLOUDFLARE_PROXY_URL:-}" ] && [ -z "$TELEGRAM_BASE_URL" ]; then
   CLOUDFLARE_PROXY_URL="${CLOUDFLARE_PROXY_URL%/}"
   export TELEGRAM_BASE_URL="${CLOUDFLARE_PROXY_URL}/bot"
@@ -257,6 +261,8 @@ promote_first_pool_key "ARCEEAI_API_KEY"      "ARCEEAI_API_KEYS"
 promote_first_pool_key "DASHSCOPE_API_KEY"    "DASHSCOPE_API_KEYS"
 promote_first_pool_key "GMI_API_KEY"          "GMI_API_KEYS"
 promote_first_pool_key "TOKENHUB_API_KEY"     "TOKENHUB_API_KEYS"
+promote_first_pool_key "EXA_API_KEY"          "EXA_API_KEYS"
+promote_first_pool_key "FIRECRAWL_API_KEY"    "FIRECRAWL_API_KEYS"
 
 # ── Build config ──
 python3 - <<'PY'
